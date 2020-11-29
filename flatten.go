@@ -1,0 +1,525 @@
+package flatten
+
+import (
+	"encoding/json"
+	"errors"
+	"regexp"
+	"fmt"
+	"strings"
+	"strconv"
+	"sort"
+	"github.com/imdario/mergo"
+	"gopkg.in/mgo.v2/bson"
+)
+
+type SeparatorStyle struct {
+	Before string
+	Middle string
+	After  string
+}
+
+
+var (
+	DotStyle = SeparatorStyle{Middle: "."}
+
+	PathStyle = SeparatorStyle{Middle: "/"}
+
+	RailsStyle = SeparatorStyle{Before: "[", After: "]"}
+
+	UnderscoreStyle = SeparatorStyle{Middle: "_"}
+)
+
+var NotValidInputError = errors.New("Not a valid input: map or slice")
+var NotValidJsonInputError = errors.New("Not a valid input, must be a map")
+var isJsonMap = regexp.MustCompile(`^\s*\{`)
+
+func Flatten(nested map[string]interface{}, prefix string, style SeparatorStyle) (map[string]interface{}, error) {
+	flatmap := make(map[string]interface{})
+
+	err := flatten(true, flatmap, nested, prefix, style)
+	if err != nil {
+		return nil, err
+	}
+
+	return flatmap, nil
+}
+
+func UnFlatten(nested map[string]interface{}, prefix string, style SeparatorStyle) (map[string]interface{}, error) {
+	flatmap := make(map[string]interface{})
+
+	err := unflatten(true, flatmap, nested, prefix, style)
+	if err != nil {
+		return nil, err
+	}
+
+	return flatmap, nil
+}
+
+
+func FlattenString(nestedstr, prefix string, style SeparatorStyle) (string, error) {
+	if !isJsonMap.MatchString(nestedstr) {
+		return "", NotValidJsonInputError
+	}
+
+	var nested map[string]interface{}
+	err := json.Unmarshal([]byte(nestedstr), &nested)
+	if err != nil {
+		return "", err
+	}
+
+	flatmap, err := Flatten(nested, prefix, style)
+	if err != nil {
+		return "", err
+	}
+
+	flatb, err := json.Marshal(&flatmap)
+	if err != nil {
+		return "", err
+	}
+
+	return string(flatb), nil
+}
+
+func UnFlattenString(nestedstr, prefix string, style SeparatorStyle) (string, error) {
+	if !isJsonMap.MatchString(nestedstr) {
+		return "", NotValidJsonInputError
+	}
+
+	var nested map[string]interface{}
+	err := json.Unmarshal([]byte(nestedstr), &nested)
+	if err != nil {
+		return "", err
+	}
+
+	flatmap, err := UnFlatten(nested, prefix, style)
+	if err != nil {
+		return "", err
+	}
+
+	flatb, err := json.Marshal(&flatmap)
+	if err != nil {
+		return "", err
+	}
+
+	return string(flatb), nil
+}
+
+func flatten(top bool, flatMap map[string]interface{}, nested interface{}, prefix string, style SeparatorStyle) error {
+	assign := func(newKey string, v interface{}) error {
+		switch v.(type) {
+		case map[string]interface{}:
+			if err := flatten(false, flatMap, v, newKey, style); err != nil {
+				return err
+			}
+		case []interface{}:
+			if err := flatten(false, flatMap, v, newKey, style); err != nil {
+				return err
+			}
+		default:
+			flatMap[newKey] = v
+		}
+
+		return nil
+	}
+
+	switch nested.(type) {
+	case map[string]interface{}:
+		for k, v := range nested.(map[string]interface{}) {
+			newKey := enkey(top, prefix, k, style)
+			assign(newKey, v)
+		}
+
+	case []interface{}:
+		for i, v := range nested.([]interface{}) {
+			newKey := enkey(top, prefix, strconv.Itoa(i), style)
+			assign(newKey, v)
+		}
+	default:
+		return NotValidInputError
+	}
+
+	return nil
+}
+
+func getKeys(m map[string]interface{}) []string {
+	// 数组默认长度为map长度,后面append时,不需要重新申请内存和拷贝,效率较高
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+
+func unflatten(top bool, flatMap map[string]interface{}, nested interface{}, prefix string, style SeparatorStyle) error {
+	uf := func (k string, v interface{}) (n interface{}) {
+		n = v
+
+		keys := strings.Split(k, ".")
+
+		for i := len(keys) - 1; i >= 0; i-- {
+			temp := make(map[string]interface{})
+			temp[keys[i]] = n
+			n = temp
+		}
+
+		return
+	}
+
+
+	switch nested.(type) {
+	case map[string]interface{}:
+		abc := nested.(map[string]interface{})
+		keys := getKeys(abc)
+		sort.Strings(keys)
+		for _, v := range  keys {
+                        temp := uf(v, abc[v]).(map[string]interface{})
+			err := mergo.Merge(&flatMap, temp)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	case []interface{}:
+
+		fmt.Println(nested.([]interface{}))
+		//for i, v := range nested.([]interface{}) {
+		//	newKey := enkey(top, prefix, strconv.Itoa(i), style)
+		//	assign(newKey, v)
+		//}
+	default:
+		return NotValidInputError
+	}
+
+	//return nil
+	return nil
+}
+
+
+func enkey(top bool, prefix, subkey string, style SeparatorStyle) string {
+	key := prefix
+
+	if top {
+		key += subkey
+	} else {
+		key += style.Before + style.Middle + subkey + style.After
+	}
+
+	return key
+}
+
+
+func unenkey(top bool, prefix, subkey string, style SeparatorStyle) string {
+	key := prefix
+
+	if top {
+		key += subkey
+	} else {
+		key += style.Before + style.Middle + subkey + style.After
+	}
+
+	return key
+}
+
+func IsNum(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
+}
+
+func getKeys2(m map[string][]interface{}) []string {
+	// 数组默认长度为map长度,后面append时,不需要重新申请内存和拷贝,效率较高
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func test5 (nested interface{}, key string, nested2 map[string][]interface{}) {
+	switch nested.(type) {
+	case map[string]interface{}:
+		//global_len := strconv.Itoa(len(getKeys2(nested2))-1)
+
+		//if len(getKeys(nested.(map[string]interface{}))) == 1 {
+		//	//first_key := getKeys(nested.(map[string]interface{}))[0]
+		//	//global_len := strconv.Itoa(len(getKeys2(nested2))-1)
+		//	//for _,v := range nested2[global_len] {
+
+		//	//	//fmt.Println("********************************")
+		//	//	//fmt.Println(key)
+		//	//	//fmt.Println(77777777777)
+
+		//	//	//fmt.Println(k)
+		//	//	//fmt.Println(v)
+		//	//	//fmt.Println("********************************")
+		//	//	cc := strings.Trim(key, ".")
+		//	//	v.(map[string]interface{})[cc] = first_key
+
+		//	//	//v[key] = nested
+
+		//	//	//fmt.Println(key)
+		//	//	//fmt.Println("77777777777")
+		//	//}
+
+		//} else {
+
+		//	for k, v := range nested.(map[string]interface{}) {
+		//		newKey := enkey2(key, ".", k)
+		//		test5(v, newKey, nested2)
+		//		//fmt.Println(k)
+		//		//fmt.Println(v)
+		//	}
+		//}
+
+
+		for k, v := range nested.(map[string]interface{}) {
+			newKey := enkey2(key, ".", k)
+			test5(v, newKey, nested2)
+			//fmt.Println(k)
+			//fmt.Println(v)
+		}
+		//fmt.Println("101010101")
+		//fmt.Println()
+		//fmt.Println("101010101")
+		//for _,d := range nested2[global_len] {
+		//	fmt.Println(d)
+		//	fmt.Println(key)
+		//	fmt.Println("77777777777")
+		//}
+	case []interface{}:
+		global_len := strconv.Itoa(len(getKeys2(nested2))-1)
+
+		entry := DeepCopy(nested2[global_len])
+		//entry := nested2[global_len]
+
+		for k, v := range nested.([]interface{}) {
+
+			if k > 0 {
+			//fmt.Println(k)
+			//fmt.Println(v)
+			//newKey := enkey(top, prefix, strconv.Itoa(i), style)
+			//assign(newKey, v)
+			//fmt.Println(entry)
+
+			//assign(newKey, v)
+			//newKey := enkey2(key, ".", v)
+
+			////fmt.Println(string() +1))
+			//k := len(getKeys2(nested2))
+
+			//fmt.Println(entry)
+			//nested2[strconv.Itoa(k)] = append(nested2[strconv.Itoa(k)],entry)
+			//append(nested2[string(len(getKeys2(nested2)) +1)],DeepCopy(entry))
+			nested2[strconv.Itoa(len(getKeys2(nested2)))] = entry.([]interface{})
+			}
+			test5(v, key, nested2)
+
+		}
+		var qq []interface{}
+		for _,v := range nested2 {
+			for _,v2 := range v {
+				qq = append(qq, v2)
+			}
+
+		}
+		nested2["0"] = qq
+
+                //list_prebuilt_flattened_dict['0'] = 
+                //    [subel for k, v in
+                //     sorted(list_prebuilt_flattened_dict.items())
+                //     for idx, subel in enumerate(v)]
+		for _,v := range getKeys2(nested2) {
+                    if v != "0" {
+			delete(nested2,v)
+		}
+		}
+
+		//for _,d := range nested2[global_len] {
+		//	fmt.Println(d)
+		//	//d[key] = nested
+		//}
+	default:
+		//fmt.Println(nested)
+		//return NotValidInputError
+		global_len := strconv.Itoa(len(getKeys2(nested2))-1)
+		for _,v := range nested2[global_len] {
+
+			cc := strings.Trim(key, ".")
+			v.(map[string]interface{})[cc] = nested
+
+			//v[key] = nested
+
+			//fmt.Println(key)
+			//fmt.Println("77777777777")
+		}
+	}
+}
+
+func DeepCopy(value interface{}) interface{} {
+	if valueMap, ok := value.(map[string]interface{}); ok {
+		newMap := make(map[string]interface{})
+		for k, v := range valueMap {
+			newMap[k] = DeepCopy(v)
+		}
+
+		return newMap
+	} else if valueSlice, ok := value.([]interface{}); ok {
+		newSlice := make([]interface{}, len(valueSlice))
+		for k, v := range valueSlice {
+			newSlice[k] = DeepCopy(v)
+		}
+
+		return newSlice
+	} else if valueMap, ok := value.(bson.M); ok {
+		newMap := make(bson.M)
+		for k, v := range valueMap {
+			newMap[k] = DeepCopy(v)
+		}
+	}
+	return value
+}
+
+
+func enkey2(prefix string, subkey string, style string) string {
+	//fmt.Println(prefix)
+	//fmt.Println(subkey)
+	//fmt.Println(style)
+	//key := prefix
+
+	//if top {
+	//	key += subkey
+	//} else {
+	//	key += style.Before + style.Middle + subkey + style.After
+	//}
+	//key := ""
+	//if style == "" {
+	//	key  = prefix
+	//} else {
+	//}
+	key := strings.Trim(prefix, ".") + subkey + style
+	//key += style.Before + style.Middle + subkey + style.After
+
+	return key
+}
+
+
+func FlattenPreserveListsString(json2 string) string {
+	flat, err := FlattenString(json2, "", DotStyle)
+	if err!= nil {
+		fmt.Println(err)
+	}
+	//fmt.Println(string(flat))
+
+	var nested map[string]interface{}
+
+	err = json.Unmarshal([]byte(flat), &nested)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+
+	nested2 := make(map[string]interface{})
+	keys := getKeys(nested)
+	for _,v := range keys {
+		vv := strings.Split(v, ".")
+		c := ""
+		for _,v2 := range vv {
+			//fmt.Println(IsNum(v2))
+			if IsNum(v2) == false {
+				if c == "" {
+					c = v2
+				} else {
+					c = c + "." +v2
+				}
+			}
+		}
+		nested2[string(c)] = ""
+		//fmt.Println(c)
+	}
+	//fmt.Println(keys)
+	nested3 := make(map[string][]interface{})
+	//nested3["0"] = []interface{}
+	nested3["0"] = append(nested3["0"], nested2)
+
+	var nested10 map[string]interface{}
+
+	err = json.Unmarshal([]byte(json2), &nested10)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	test5(nested10, "", nested3)
+	q := nested3["0"]
+
+	flatb, err := json.Marshal(q)
+	if err != nil {
+		fmt.Println(err)
+	}
+	//fmt.Println(string(flatb))
+	return string(flatb)
+
+}
+func FlattenPreserveLists(json2 string) *[]interface{} {
+
+	flat, err := FlattenString(json2, "", DotStyle)
+	if err!= nil {
+		fmt.Println(err)
+	}
+	//fmt.Println(string(flat))
+
+	var nested map[string]interface{}
+
+	err = json.Unmarshal([]byte(flat), &nested)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+
+	nested2 := make(map[string]interface{})
+	keys := getKeys(nested)
+	for _,v := range keys {
+		vv := strings.Split(v, ".")
+		c := ""
+		for _,v2 := range vv {
+			//fmt.Println(IsNum(v2))
+			if IsNum(v2) == false {
+				if c == "" {
+					c = v2
+				} else {
+					c = c + "." +v2
+				}
+			}
+		}
+		nested2[string(c)] = ""
+		//fmt.Println(c)
+	}
+	//fmt.Println(keys)
+	nested3 := make(map[string][]interface{})
+	//nested3["0"] = []interface{}
+	nested3["0"] = append(nested3["0"], nested2)
+
+	var nested10 map[string]interface{}
+
+	err = json.Unmarshal([]byte(json2), &nested10)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	test5(nested10, "", nested3)
+	q := nested3["0"]
+	return &q
+}
+
+
+//const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}]}`
+const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard","test":[{"test":"test"}]},{"first":"Janet","last":"Prichard22","test":[{"test":"test"}]}]}`
+//const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard","test":[{"test":"test2","test5":"test5"},{"test":"test2","test5":"test5"}]},{"first":"Janet","last":"Prichard22","test":[{"test":"test2"}]}]}`
+
+
+func main() {
+	flatb := FlattenPreserveLists(json2)
+
+	fmt.Println(flatb)
+	flatb2 := FlattenPreserveListsString(json2)
+
+	fmt.Println(flatb2)
+}
