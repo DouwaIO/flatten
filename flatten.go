@@ -234,84 +234,43 @@ func getKeys2(m map[string][]interface{}) []string {
 	return keys
 }
 
-func test5 (nested interface{}, key string, nested2 map[string][]interface{}) {
+func test5 (nested interface{}, key string, nested2 map[string][]interface{}, nested3 []string) {
 	switch nested.(type) {
 	case map[string]interface{}:
-		//global_len := strconv.Itoa(len(getKeys2(nested2))-1)
-
-		//if len(getKeys(nested.(map[string]interface{}))) == 1 {
-		//	//first_key := getKeys(nested.(map[string]interface{}))[0]
-		//	//global_len := strconv.Itoa(len(getKeys2(nested2))-1)
-		//	//for _,v := range nested2[global_len] {
-
-		//	//	//fmt.Println("********************************")
-		//	//	//fmt.Println(key)
-		//	//	//fmt.Println(77777777777)
-
-		//	//	//fmt.Println(k)
-		//	//	//fmt.Println(v)
-		//	//	//fmt.Println("********************************")
-		//	//	cc := strings.Trim(key, ".")
-		//	//	v.(map[string]interface{})[cc] = first_key
-
-		//	//	//v[key] = nested
-
-		//	//	//fmt.Println(key)
-		//	//	//fmt.Println("77777777777")
-		//	//}
-
-		//} else {
-
-		//	for k, v := range nested.(map[string]interface{}) {
-		//		newKey := enkey2(key, ".", k)
-		//		test5(v, newKey, nested2)
-		//		//fmt.Println(k)
-		//		//fmt.Println(v)
-		//	}
-		//}
-
-
 		for k, v := range nested.(map[string]interface{}) {
 			newKey := enkey2(key, ".", k)
-			test5(v, newKey, nested2)
+			cc := strings.Trim(newKey, ".")
+			fmt.Println(cc)
+			for _,v2 := range nested3 {
+				if strings.Split(v2, ".")[0] == cc {
+
+					test5(v, newKey, nested2, nested3)
+
+				} else if v2  == cc {
+
+					test5(v, newKey, nested2, nested3)
+
+				} 
+
+			}
+
+			//if _, ok := nested3[]; ok {
+			//	test5(v, newKey, nested2, nested3)
+			//}
 			//fmt.Println(k)
 			//fmt.Println(v)
 		}
-		//fmt.Println("101010101")
-		//fmt.Println()
-		//fmt.Println("101010101")
-		//for _,d := range nested2[global_len] {
-		//	fmt.Println(d)
-		//	fmt.Println(key)
-		//	fmt.Println("77777777777")
-		//}
 	case []interface{}:
 		global_len := strconv.Itoa(len(getKeys2(nested2))-1)
 
 		entry := DeepCopy(nested2[global_len])
-		//entry := nested2[global_len]
 
 		for k, v := range nested.([]interface{}) {
 
 			if k > 0 {
-			//fmt.Println(k)
-			//fmt.Println(v)
-			//newKey := enkey(top, prefix, strconv.Itoa(i), style)
-			//assign(newKey, v)
-			//fmt.Println(entry)
-
-			//assign(newKey, v)
-			//newKey := enkey2(key, ".", v)
-
-			////fmt.Println(string() +1))
-			//k := len(getKeys2(nested2))
-
-			//fmt.Println(entry)
-			//nested2[strconv.Itoa(k)] = append(nested2[strconv.Itoa(k)],entry)
-			//append(nested2[string(len(getKeys2(nested2)) +1)],DeepCopy(entry))
-			nested2[strconv.Itoa(len(getKeys2(nested2)))] = entry.([]interface{})
+				nested2[strconv.Itoa(len(getKeys2(nested2)))] = entry.([]interface{})
 			}
-			test5(v, key, nested2)
+			test5(v, key, nested2, nested3)
 
 		}
 		var qq []interface{}
@@ -323,33 +282,18 @@ func test5 (nested interface{}, key string, nested2 map[string][]interface{}) {
 		}
 		nested2["0"] = qq
 
-                //list_prebuilt_flattened_dict['0'] = 
-                //    [subel for k, v in
-                //     sorted(list_prebuilt_flattened_dict.items())
-                //     for idx, subel in enumerate(v)]
 		for _,v := range getKeys2(nested2) {
                     if v != "0" {
 			delete(nested2,v)
 		}
+
 		}
 
-		//for _,d := range nested2[global_len] {
-		//	fmt.Println(d)
-		//	//d[key] = nested
-		//}
 	default:
-		//fmt.Println(nested)
-		//return NotValidInputError
 		global_len := strconv.Itoa(len(getKeys2(nested2))-1)
 		for _,v := range nested2[global_len] {
-
 			cc := strings.Trim(key, ".")
 			v.(map[string]interface{})[cc] = nested
-
-			//v[key] = nested
-
-			//fmt.Println(key)
-			//fmt.Println("77777777777")
 		}
 	}
 }
@@ -447,7 +391,12 @@ func FlattenPreserveListsString(json2 string) string {
 		fmt.Println(err)
 	}
 
-	test5(nested10, "", nested3)
+	//nested4 := make(map[string]interface{})
+	//nested4["age"] = ""
+
+	nested4 :=[]string{"age","name.first"}
+	test5(nested10, "", nested3, nested4)
+
 	q := nested3["0"]
 
 	flatb, err := json.Marshal(q)
@@ -458,7 +407,7 @@ func FlattenPreserveListsString(json2 string) string {
 	return string(flatb)
 
 }
-func FlattenPreserveLists(json2 string) *[]interface{} {
+func FlattenPreserveLists(json2 string, test ...string) *[]interface{} {
 
 	flat, err := FlattenString(json2, "", DotStyle)
 	if err!= nil {
@@ -475,27 +424,29 @@ func FlattenPreserveLists(json2 string) *[]interface{} {
 
 
 	nested2 := make(map[string]interface{})
-	keys := getKeys(nested)
-	for _,v := range keys {
-		vv := strings.Split(v, ".")
-		c := ""
-		for _,v2 := range vv {
-			//fmt.Println(IsNum(v2))
-			if IsNum(v2) == false {
-				if c == "" {
-					c = v2
-				} else {
-					c = c + "." +v2
-				}
-			}
-		}
-		nested2[string(c)] = ""
-		//fmt.Println(c)
-	}
+	//keys := getKeys(nested)
+	//for _,v := range keys {
+	//	vv := strings.Split(v, ".")
+	//	c := ""
+	//	for _,v2 := range vv {
+	//		//fmt.Println(IsNum(v2))
+	//		if IsNum(v2) == false {
+	//			if c == "" {
+	//				c = v2
+	//			} else {
+	//				c = c + "." +v2
+	//			}
+	//		}
+	//	}
+	//	nested2[string(c)] = ""
+	//	//fmt.Println(c)
+	//}
 	//fmt.Println(keys)
 	nested3 := make(map[string][]interface{})
 	//nested3["0"] = []interface{}
+	//nested2["age"] = ""
 	nested3["0"] = append(nested3["0"], nested2)
+	//map[0:[map[age: name.first: name.last: qqqq.first: qqqq.last: qqqq.test.test:]]]
 
 	var nested10 map[string]interface{}
 
@@ -503,8 +454,14 @@ func FlattenPreserveLists(json2 string) *[]interface{} {
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Println(nested3)
 
-	test5(nested10, "", nested3)
+	//nested4 :=[]string{"age","name.first"}
+	//nested4["age"] = ""
+	//nested4["name.first"] = ""
+
+
+	test5(nested10, "", nested3, test)
 	q := nested3["0"]
 	return &q
 }
@@ -516,10 +473,11 @@ const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","la
 
 
 func main() {
-	flatb := FlattenPreserveLists(json2)
+	nested4 :=[]string{"age","name.first"}
+	flatb := FlattenPreserveLists(json2, nested4...)
 
 	fmt.Println(flatb)
-	flatb2 := FlattenPreserveListsString(json2)
+	//flatb2 := FlattenPreserveListsString(json2)
 
-	fmt.Println(flatb2)
+	//fmt.Println(flatb2)
 }
