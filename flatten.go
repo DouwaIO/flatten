@@ -245,12 +245,13 @@ func test5 (nested interface{}, key string, nested2 map[string][]interface{}, ne
 				if strings.Split(v2, ".")[0] == cc {
 
 					test5(v, newKey, nested2, nested3)
+					break
 
 				} else if v2  == cc {
-
 					test5(v, newKey, nested2, nested3)
+					break
 
-				} 
+				}
 
 			}
 
