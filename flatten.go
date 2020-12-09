@@ -469,12 +469,14 @@ func FlattenPreserveLists(json2 string, test ...string) *[]interface{} {
 
 
 //const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}]}`
-const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard","test":[{"test":"test"}]},{"first":"Janet","last":"Prichard22","test":[{"test":"test"}]}]}`
+//const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard","test":[{"test":"test"}]},{"first":"Janet","last":"Prichard22","test":[{"test":"test"}]}]}`
 //const json2 = `{"name":[{"first":"Janet","last":"Prichard"},{"first":"Janet","last":"Prichard22"}],"age":47,"qqqq":[{"first":"Janet","last":"Prichard","test":[{"test":"test2","test5":"test5"},{"test":"test2","test5":"test5"}]},{"first":"Janet","last":"Prichard22","test":[{"test":"test2"}]}]}`
 
+const json2 = `{"F0001":"上海仓库","F0003":"344","F0004":[{"C0002":"橘子","C0003":"0002","C0004":"5","C0005":"10","C0006":"50"},{"C0002":"橘子","C0003":"0002","C0004":"19","C0005":"10","C0006":"190"},{"C0002":"西瓜","C0003":"0001","C0004":"3","C0005":"5","C0006":"15"}],"F0005":"3","F0006":"255"}`
 
 func main() {
-	nested4 :=[]string{"age","name.first"}
+	//nested4 :=[]string{"age","name.first"}
+	nested4 :=[]string{"F0001","F0004.C0002", "F0004.C0006", "F0004.C0003"}
 	flatb := FlattenPreserveLists(json2, nested4...)
 
 	fmt.Println(flatb)
