@@ -264,9 +264,9 @@ func test5 (nested interface{}, key string, nested2 map[string][]interface{}, ne
 	case []interface{}:
 		global_len := strconv.Itoa(len(getKeys2(nested2))-1)
 
-		entry := DeepCopy(nested2[global_len])
 
 		for k, v := range nested.([]interface{}) {
+			entry := DeepCopy(nested2[global_len])
 
 			if k > 0 {
 				nested2[strconv.Itoa(len(getKeys2(nested2)))] = entry.([]interface{})
