@@ -241,19 +241,23 @@ func test5 (nested interface{}, key string, nested2 map[string][]interface{}, ne
 			newKey := enkey2(key, ".", k)
 			cc := strings.Trim(newKey, ".")
 			fmt.Println(cc)
-			for _,v2 := range nested3 {
-				if strings.Split(v2, ".")[0] == cc {
+                        if len(nested3) == 0 {
+			  test5(v, newKey, nested2, nested3)
+                        } else {
+			  for _,v2 := range nested3 {
+			  	if strings.Split(v2, ".")[0] == cc {
 
-					test5(v, newKey, nested2, nested3)
-					break
+			  		test5(v, newKey, nested2, nested3)
+			  		break
 
-				} else if v2  == cc {
-					test5(v, newKey, nested2, nested3)
-					break
+			  	} else if v2  == cc {
+			  		test5(v, newKey, nested2, nested3)
+			  		break
 
-				}
+			  	}
 
-			}
+			  }
+                        }
 
 			//if _, ok := nested3[]; ok {
 			//	test5(v, newKey, nested2, nested3)
